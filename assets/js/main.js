@@ -24,17 +24,14 @@ $(document).ready(function($){
   }
   $('.reply').click(reply) ;
   // follow, unfollow
-  $('a.follow').click(function(e){
+  function follow_unfollow(e) {
     e.preventDefault();
     var following = $(this).attr('following');
-    var href_parts = $(this).attr('href').split("/");
-    href_parts.pop();  
     $.ajax({
       url: $(this).attr('href'),
       context: this                 
     }).done(function(data) {
       // 1 success
-      data = 1;
       if(data==1) {
         var following_count =  $('#following_count').html();
         if(following==1) {
@@ -47,16 +44,16 @@ $(document).ready(function($){
           $('#following_count').html(parseInt(following_count)+1);     
         }
         $(this).attr('following', following);
-        $(this).attr('href', href_parts.join('/')+'/'+following);   
+        $(this).attr('href', __links['ajax'] + '?user_id=' + user_id + '&following=' + following);   
       }
     });
-  });
+  }
+  $('a.follow').click(follow_unfollow);
   // retweet, unretweet
   function retweet_unretweet(e) {
     e.preventDefault();
     var retweeted = $(this).attr('retweeted');
-    var href_parts = $(this).attr('href').split("/");
-    href_parts.pop();
+    var tweet_id = $(this).attr('tweet_id');
     $.ajax({
       url: $(this).attr('href'),
       context: this                 
@@ -74,14 +71,13 @@ $(document).ready(function($){
           $('#my_tweets_count').html(parseInt(my_tweets_count)+1);    
         }
         $(this).attr('retweeted', retweeted);
-        $(this).attr('href', href_parts.join('/')+'/'+retweeted);   
+        $(this).attr('href', __links['ajax'] + '?tweet_id=' + tweet_id + '&retweeted=' + retweeted);   
       }
     });
   } 
   $('a.retweet').click(retweet_unretweet);
 
-  function parse_tweet_template(tweet, ajax_loader){
-    var user_id = ajax_loader.attr('user_id'); 
+  function parse_tweet_template(tweet, ajax_loader){ 
     var tweet_template = '<div class="tweet" id="">' +
       '<div class="tweet-user">' +
       '<span class="tweet-user-fullname"></span>' +
@@ -114,11 +110,7 @@ $(document).ready(function($){
     }
     // conversation
     if(tweet["conversation_link"] == 1) {
-      var tweets_conversation_link = ajax_loader.attr('tweets_link');
-      var tweets_conversation_link_parts = tweets_conversation_link.split('/');
-      tweets_conversation_link_parts.pop();
-      tweets_conversation_link_parts.pop();
-      tweet_div.find('p:last').after('<a href="' + tweets_conversation_link_parts.join('/') + '/' + tweet["tweet_id"] + '/1' + '" class="show-conversation">Show conversation</a>');        
+      tweet_div.find('p:last').after('<a href="' + __links['ajax'] + '?tweet_id=' + tweet["tweet_id"] + '&recursive=1' + '" class="show-conversation">Show conversation</a>');        
       tweet_div.find('a.show-conversation').click(show_conversation);  
     }
     // reply, textarea
@@ -127,24 +119,40 @@ $(document).ready(function($){
     tweet_div.find('textarea[name=tweet]').keyup(tweet_limit);
     // retweeting
     if (user_id != tweet["user_id"]) {
-      var retweet_link = ajax_loader.attr('retweet_link');
-      var retweet_link_parts = retweet_link.split('/');
-      retweet_link_parts.pop();
-      retweet_link_parts.pop();
       var link_title = 'Retweet';
       if(tweet["retweeted"]) {
         link_title = 'Retweeted';    
       } 
-      tweet_div.find('a.reply').before('<a href="' + retweet_link_parts.join('/') + '/' + tweet["tweet_id"] + '/' + tweet["retweeted"] + '" retweeted="' + tweet["retweeted"] + '" class="retweet">' + link_title + '</a>');         
+      tweet_div.find('a.reply').before('<a href="' + __links['ajax'] + '?tweet_id=' + tweet["tweet_id"] + '&retweeted' + tweet["retweeted"] + '" retweeted="' + tweet["retweeted"] + '" class="retweet">' + link_title + '</a>');         
       tweet_div.find('a.retweet').click(retweet_unretweet);
     }
     if (user_id == tweet["user_id"]) {
-      var delete_link = ajax_loader.attr('delete_link');
-      var delete_link_parts = delete_link.split('/');
-      delete_link_parts.pop();
-      tweet_div.find('a.reply').after('<a href="' + delete_link_parts.join('/') + '/' + tweet["tweet_id"] + '" class="delete">Delete</a>'); 
+      tweet_div.find('a.reply').after('<a href="' + __links['home'] + '?tweet_id=' + tweet["tweet_id"] + '" class="delete">Delete</a>'); 
     }               
     return tweet_div;    
+  }
+  function parse_user_template(user, ajax_loader) { 
+    var user_template = '<div class="user">' +
+      '<span></span>' +
+      '<span class="light-grey"></span>' +
+      '<a href="" user_id="" following="" class="follow btn btn-default">' +
+      '</a></div>';
+      
+    var user_div = $(user_template);
+    user_div.find('span:first').html(user["fullname"]); 
+    user_div.find('span.light-grey').html(user["username"]); 
+    user_div.find('a').attr('href', __links['ajax'] + '?user_id=' + user["user_id"] + '&following=' + user["following"]);
+    user_div.find('a').attr('user_id', user["user_id"]);
+    user_div.find('a').attr('following', user["following"]);
+    
+    if (user["following"]) {
+      user_div.find('a').html('Unfollow');  
+    } else {
+      user_div.find('a').html('Follow');
+    }
+    user_div.find('a').click(follow_unfollow);
+    
+    return user_div; 
   }
   // show conversation function for assigning to links
   function show_conversation(e) {
@@ -174,27 +182,40 @@ $(document).ready(function($){
   var miliseconds_interval = 51;
   var miliseconds;
   var miliseconds2;
-  var more_tweets = true; 
-
+  var more_data = true; 
+  var ajax_url = '';
+  var div_class = 'tweet';
+  var data_per_page = 8;
+  if(__show == 'all_tweets' || __show == 'my_tweets') {
+    ajax_url = __links['ajax'] + '?tweet_id=0&recursive=0&show=' + __show;
+  } else {
+    div_class = 'user';
+    data_per_page = 30;
+    ajax_url = __links['ajax'] + '?show=' + __show + '&search_keyword=' + __search_keyword;
+  } 
   $(window).scroll(function()
     {      
       miliseconds = new Date().getTime();
       var ajax_loader = $('div#loadmoreajaxloader'); 
-      if(($(document).height() - $(window).height()) == $(window).scrollTop() && $('div.tweet').length > 0 && more_tweets && miliseconds_interval > 50)
+      if(($(document).height() - $(window).height()) == $(window).scrollTop() && $('div.'+div_class).length > 0 && more_data && miliseconds_interval > 50)
       {
         miliseconds2 = new Date().getTime();
         miliseconds_interval = miliseconds2 - miliseconds;
         ajax_loader.show();
         $.ajax({
-          url: ajax_loader.attr('tweets_link'),
-          success: function(tweets)
-          {      
-            if(tweets.length > 0)
+          url: ajax_url,
+          success: function(data)
+          {   
+            if(data.length > 0)
             { 
-              for (index in tweets) {
-                if (tweets.hasOwnProperty(index)) {
-                  var parsed_tweet_template = parse_tweet_template(tweets[index], ajax_loader);
-                  ajax_loader.before(parsed_tweet_template);
+              for (index in data) {
+                if (data.hasOwnProperty(index)) {
+                  if (div_class == 'tweet') {
+                    var parsed_template = parse_tweet_template(data[index], ajax_loader);
+                  } else {
+                    var parsed_template = parse_user_template(data[index], ajax_loader);
+                  }
+                  ajax_loader.before(parsed_template);
                 }
               }
               ajax_loader.hide();
@@ -202,16 +223,16 @@ $(document).ready(function($){
               miliseconds2 = new Date().getTime();
               miliseconds_interval = miliseconds2 - miliseconds;
 
-              if (tweets.length < 8) {
-                more_tweets = false;
+              if (data.length < data_per_page) {
+                more_data = false;
               }
             } else {
-              more_tweets = false;
+              more_data = false;
               ajax_loader.hide();
             }
           },
           error: function(){
-            more_tweets = false;
+            more_data = false;
             ajax_loader.hide();
           },
         });

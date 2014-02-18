@@ -5,10 +5,6 @@ body {
   background-color: #3a92c8;  
 }
 
-.wrapper {
-    border-top: 1px solid black;
-}
-
 /* Global navigation bar */
 .global-nav { 
     position: fixed;
@@ -46,7 +42,6 @@ div.login {
     width: 40%;
     border-radius: 5px;
     padding: 10px;
-    margin-top: 70px;
 }
 
 div.login form{
@@ -77,15 +72,12 @@ div.login a {
 .main {
     width: 800px;
     margin: 0 auto;
+    padding-top: 70px;
 }
 
 .main-logged-in {
     width: 800px;
     margin: 20px auto;
-}
-
-#content {
-    padding-top: 60px;
 }
 
 .main-content {
@@ -98,6 +90,8 @@ div.login a {
     padding: 0 10px 10px 10px;
     border-bottom: 1px solid #cccccc;
 }
+/* User in main section */
+
 div.user {
     border-bottom: 1px solid #cccccc;
     width: 100%;
@@ -110,7 +104,9 @@ div.user a {
     float:right;
     font-weight: bold;    
 }
-
+div.user span:first-child {
+    margin-right: 10px;    
+}
 .light-grey {
     color:#999;    
 }
